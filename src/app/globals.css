@@ -1,0 +1,35 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* 宣紙質感底色 + 極淡橫紋 */
+body {
+  background-color: #FAF3E0;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 47px,
+      rgba(26, 60, 52, 0.04) 47px,
+      rgba(26, 60, 52, 0.04) 48px
+    );
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 鍵盤 focus 環（無障礙） */
+*:focus-visible {
+  outline: 3px solid #C0392B;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* 防止 iOS Safari 自動放大輸入框 */
+input, textarea, select {
+  font-size: max(16px, 1em);
+}
