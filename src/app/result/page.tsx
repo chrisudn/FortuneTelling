@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { loadCastSession, type CastSession } from '@/lib/storage'
 import { buildReadingResult, type ReadingResult } from '@/lib/hexagram'
@@ -22,9 +22,9 @@ export default function ResultPage() {
   const [showChat, setShowChat] = useState(false)
   const [hasProfile, setHasProfile] = useState(false)
   const [savedEntryId, setSavedEntryId] = useState<string | null>(null)
+  const savedEntryIdRef = useRef<string | null>(null)
   const [aiFirstResponse, setAiFirstResponse] = useState('')
-  const [endedConversation, setEndedConversation] = useState<ChatMessage[] | null>(null)
-  const [conversationSaved, setConversationSaved] = useState(false)
+  const [liveMessages, setLiveMessages] = useState<ChatMessage[]>([])
   const toast = useToast()
 
   useEffect(() => {
@@ -43,16 +43,13 @@ export default function ResultPage() {
     return buildHexagramContext(session, reading, recentEntries)
   }, [session, reading, hasProfile])
 
-  const handleSaveConversation = () => {
-    if (!endedConversation || conversationSaved) return
-    if (!savedEntryId) {
-      toast.show('請先儲存此次占卜')
-      return
+  // 每輪 AI 回應完成後：更新 liveMessages，若已存日記則自動追加對話
+  const handleRoundComplete = useCallback((messages: ChatMessage[]) => {
+    setLiveMessages(messages)
+    if (savedEntryIdRef.current) {
+      updateDiaryEntry(savedEntryIdRef.current, { aiConversation: messages })
     }
-    updateDiaryEntry(savedEntryId, { aiConversation: endedConversation })
-    setConversationSaved(true)
-    toast.show('✓ 對話已儲存至日記')
-  }
+  }, [])
 
   const handleSave = () => {
     if (!session || !reading || savedEntryId) return
@@ -69,7 +66,9 @@ export default function ResultPage() {
       changingPositions: session.changingPositions,
       hasChanges: session.hasChanges,
       aiFirstResponse,
+      aiConversation: liveMessages.length > 0 ? liveMessages : undefined,
     })
+    savedEntryIdRef.current = entry.id
     setSavedEntryId(entry.id)
     toast.show('✓ 已儲存至日記')
   }
@@ -256,22 +255,8 @@ export default function ResultPage() {
             hexagramContext={hexagramContext}
             maxRounds={hasProfile ? 10 : 3}
             onFirstResponse={setAiFirstResponse}
-            onConversationEnd={setEndedConversation}
+            onRoundComplete={handleRoundComplete}
           />
-
-          {/* 對話結束後：手動儲存對話按鈕 */}
-          {endedConversation && !conversationSaved && (
-            <button
-              onClick={handleSaveConversation}
-              className="w-full py-4 rounded-xl text-base font-medium text-ink
-                         border-2 border-ink/20 active:bg-ink/5 transition-colors mt-2"
-            >
-              儲存對話至日記
-            </button>
-          )}
-          {conversationSaved && (
-            <p className="text-center text-inkDark/40 text-sm mt-2">✓ 對話已儲存</p>
-          )}
         </div>
       )}
 

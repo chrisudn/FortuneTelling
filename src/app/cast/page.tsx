@@ -4,26 +4,82 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { castHexagram, type CastLine, type CastResult, type LineType } from '@/lib/casting'
 import { saveCastSession } from '@/lib/storage'
 
+const SOUND_KEY = 'gua_yu_sound'
+
 // 每種爻型對應的三枚硬幣正反面（true=陽/正面, false=陰/背面）
 const COIN_FACES: Record<LineType, [boolean, boolean, boolean]> = {
-  oldYang:   [true,  true,  true ],  // 老陽：3 陽
-  youngYin:  [true,  true,  false],  // 少陰：2 陽 1 陰
-  youngYang: [true,  false, false],  // 少陽：1 陽 2 陰
-  oldYin:    [false, false, false],  // 老陰：3 陰
+  oldYang:   [true,  true,  true ],
+  youngYin:  [true,  true,  false],
+  youngYang: [true,  false, false],
+  oldYin:    [false, false, false],
 }
 
 const YAO_LABELS = ['初爻', '二爻', '三爻', '四爻', '五爻', '上爻']
 
-// ── 單枚硬幣元件 ────────────────────────────────────────────────
+// ── 硬幣敲擊音效（Web Audio API 合成） ──────────────────────────
+// 每枚硬幣 = 噪音爆破（撞擊感）+ 高頻金屬共鳴（叮聲），三枚錯開 18ms
+function playFlipSound() {
+  try {
+    const AudioCtx = window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+    const ctx = new AudioCtx()
+
+    const strikes = [0, 0.018, 0.036] // 三枚硬幣落地時間差
+
+    strikes.forEach(offset => {
+      const t = ctx.currentTime + offset
+
+      // 撞擊噪音（highpass 過濾，模擬金屬碰撞的「啪」）
+      const noiseLen = Math.floor(ctx.sampleRate * 0.025)
+      const noiseBuf = ctx.createBuffer(1, noiseLen, ctx.sampleRate)
+      const noiseData = noiseBuf.getChannelData(0)
+      for (let i = 0; i < noiseLen; i++) noiseData[i] = Math.random() * 2 - 1
+
+      const noiseSrc = ctx.createBufferSource()
+      noiseSrc.buffer = noiseBuf
+
+      const hipass = ctx.createBiquadFilter()
+      hipass.type = 'highpass'
+      hipass.frequency.value = 3500
+
+      const noiseGain = ctx.createGain()
+      noiseGain.gain.setValueAtTime(0.55, t)
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.022)
+
+      noiseSrc.connect(hipass)
+      hipass.connect(noiseGain)
+      noiseGain.connect(ctx.destination)
+      noiseSrc.start(t)
+
+      // 金屬共鳴（正弦波快速衰減，模擬銅錢「叮」）
+      const osc = ctx.createOscillator()
+      const oscGain = ctx.createGain()
+      osc.connect(oscGain)
+      oscGain.connect(ctx.destination)
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(2000, t)
+      osc.frequency.exponentialRampToValueAtTime(1200, t + 0.07)
+      oscGain.gain.setValueAtTime(0, t)
+      oscGain.gain.linearRampToValueAtTime(0.2, t + 0.003)
+      oscGain.gain.exponentialRampToValueAtTime(0.001, t + 0.08)
+      osc.start(t)
+      osc.stop(t + 0.08)
+    })
+
+    setTimeout(() => ctx.close(), 500)
+  } catch {
+    // 不支援 AudioContext 時靜默忽略
+  }
+}
+
+// ── 單枚硬幣元件 ─────────────────────────────────────────────────
 function Coin({ isYang, flipped }: { isYang: boolean; flipped: boolean }) {
   return (
     <div className="coin-wrap">
       <div className={`coin-inner ${flipped ? 'flipped' : ''}`}>
-        {/* 背面（翻轉前） */}
         <div className="coin-side coin-back">
           <span className="text-inkDark/30 font-bold text-lg select-none">？</span>
         </div>
-        {/* 正面（翻轉後） */}
         <div className={`coin-side ${isYang ? 'coin-yang' : 'coin-yin'}`}>
           <span className={`font-bold text-sm select-none
                             ${isYang ? 'text-vermilion' : 'text-paper'}`}>
@@ -35,18 +91,36 @@ function Coin({ isYang, flipped }: { isYang: boolean; flipped: boolean }) {
   )
 }
 
-// ── 主體元件 ────────────────────────────────────────────────────
+// ── 主體元件 ─────────────────────────────────────────────────────
 function CastContent() {
   const searchParams = useSearchParams()
   const question     = searchParams.get('q') ?? ''
   const router       = useRouter()
 
   const [lines,       setLines]       = useState<CastLine[]>([])
-  const [doneIdx,     setDoneIdx]     = useState<number[]>([])  // 已完成的爻 index
-  const [activeLine,  setActiveLine]  = useState(-1)            // 正在動畫的爻 (-1=等待)
+  const [doneIdx,     setDoneIdx]     = useState<number[]>([])
+  const [activeLine,  setActiveLine]  = useState(-1)
   const [coinFlipped, setCoinFlipped] = useState(false)
   const [showButton,  setShowButton]  = useState(false)
   const castRef = useRef<CastResult | null>(null)
+
+  // 靜音設定：預設靜音，從 localStorage 讀取
+  const [isMuted, setIsMuted] = useState(true)
+  const isMutedRef = useRef(true)
+
+  useEffect(() => {
+    const stored = localStorage.getItem(SOUND_KEY)
+    const muted = stored !== 'on'
+    setIsMuted(muted)
+    isMutedRef.current = muted
+  }, [])
+
+  const toggleMute = () => {
+    const next = !isMuted
+    setIsMuted(next)
+    isMutedRef.current = next
+    localStorage.setItem(SOUND_KEY, next ? 'off' : 'on')
+  }
 
   // 初始化：起卦
   useEffect(() => {
@@ -63,16 +137,18 @@ function CastContent() {
 
     setCoinFlipped(false)
 
-    // 300ms 後硬幣翻面
-    const t1 = setTimeout(() => setCoinFlipped(true), 300)
-    // 翻面 520ms 後（300+520+130）爻線出現
+    // 300ms 後硬幣翻面，同時播放音效
+    const t1 = setTimeout(() => {
+      setCoinFlipped(true)
+      if (!isMutedRef.current) playFlipSound()
+    }, 300)
+
     const t2 = setTimeout(() => setDoneIdx(prev => [...prev, activeLine]), 950)
-    // 再 300ms 後進入下一爻
     const t3 = setTimeout(() => {
       if (activeLine < 5) {
         setActiveLine(activeLine + 1)
       } else {
-        setActiveLine(6) // 全部完成
+        setActiveLine(6)
         setTimeout(() => setShowButton(true), 400)
       }
     }, 1250)
@@ -99,7 +175,17 @@ function CastContent() {
     : null
 
   return (
-    <div className="flex flex-col min-h-screen px-6 py-10 bg-paper">
+    <div className="relative flex flex-col min-h-screen px-6 py-10 bg-paper">
+
+      {/* 靜音切換按鈕 */}
+      <button
+        onClick={toggleMute}
+        aria-label={isMuted ? '開啟音效' : '關閉音效'}
+        className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center
+                   rounded-full text-inkDark/40 active:bg-ink/5 transition-colors text-xl"
+      >
+        {isMuted ? '🔕' : '🔔'}
+      </button>
 
       {/* 問題 */}
       <div className="mb-8">
@@ -154,7 +240,6 @@ function CastContent() {
                 <Coin key={ci} isYang={isYang} flipped={coinFlipped} />
               ))}
             </div>
-            {/* 翻面後才顯示爻名稱 */}
             {coinFlipped && (
               <span className={`text-base animate-fadeIn
                 ${activeData.isChanging ? 'text-vermilion font-bold' : 'text-inkDark/60'}`}>

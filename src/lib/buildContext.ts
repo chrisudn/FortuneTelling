@@ -29,6 +29,15 @@ export function buildHexagramContext(
     lines.push('')
     lines.push(`之卦：${changedHexagram.name}（${changedHexagram.altName}）`)
     lines.push(`之卦卦辭：${changedHexagram.guaCi}`)
+    lines.push(`之卦大象傳：${changedHexagram.image}`)
+    if (session.changingPositions.length > 0) {
+      const posLabels = session.changingPositions.map(p => YAO_NAMES[p] + '爻').join('、')
+      lines.push(`動爻在之卦（${posLabels}）：`)
+      session.changingPositions.forEach(pos => {
+        const yao = changedHexagram.yaoCi[pos]
+        if (yao) lines.push(`  ${yao.position}：${yao.text}`)
+      })
+    }
   }
 
   if (!session.hasChanges) {

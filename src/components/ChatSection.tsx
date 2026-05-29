@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
+import FormattedText from '@/components/FormattedText'
 
 export interface ChatMessage {
   role: 'user' | 'assistant'
@@ -10,14 +11,14 @@ interface ChatSectionProps {
   hexagramContext: string
   maxRounds?: number
   onFirstResponse?: (response: string) => void
-  onConversationEnd?: (messages: ChatMessage[]) => void
+  onRoundComplete?: (messages: ChatMessage[]) => void
 }
 
 export default function ChatSection({
   hexagramContext,
   maxRounds = 3,
   onFirstResponse,
-  onConversationEnd,
+  onRoundComplete,
 }: ChatSectionProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -27,7 +28,6 @@ export default function ChatSection({
   const [error, setError] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const firstResponseFired = useRef(false)
-  const conversationEndFired = useRef(false)
 
   // 載入後自動觸發第一輪
   useEffect(() => { sendToAI([]) }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -68,20 +68,15 @@ export default function ChatSection({
       const nextMessages = [...history, aiMessage]
       setMessages(nextMessages)
       setStreamText('')
-      const nextRound = round + 1
-      setRound(nextRound)
+      setRound(r => r + 1)
 
-      // 第一輪完成後回傳給父元件（用於儲存日記）
       if (!firstResponseFired.current && onFirstResponse) {
         firstResponseFired.current = true
         onFirstResponse(accumulated)
       }
 
-      // 達到對話上限時，回傳完整對話（用於手動儲存）
-      if (nextRound >= maxRounds && !conversationEndFired.current && onConversationEnd) {
-        conversationEndFired.current = true
-        onConversationEnd(nextMessages)
-      }
+      // 每輪完成後通知父元件（用於自動儲存對話）
+      onRoundComplete?.(nextMessages)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : '發生未知錯誤，請稍後再試')
     } finally {
@@ -116,7 +111,10 @@ export default function ChatSection({
                 ? 'bg-ink text-white rounded-br-sm'
                 : 'bg-white/80 text-inkDark border border-ink/10 rounded-bl-sm'
               }`}>
-              {msg.content}
+              {msg.role === 'assistant'
+                ? <FormattedText text={msg.content} />
+                : msg.content
+              }
             </div>
           </div>
         ))}
@@ -126,13 +124,16 @@ export default function ChatSection({
           <div className="flex justify-start">
             <div className="max-w-[85%] rounded-2xl rounded-bl-sm px-4 py-3 text-base
                             leading-relaxed bg-white/80 text-inkDark border border-ink/10">
-              {streamText || (
-                <span className="flex gap-1 items-center text-inkDark/40 py-1">
-                  <span className="w-2 h-2 rounded-full bg-inkDark/30 animate-bounce [animation-delay:0ms]" />
-                  <span className="w-2 h-2 rounded-full bg-inkDark/30 animate-bounce [animation-delay:150ms]" />
-                  <span className="w-2 h-2 rounded-full bg-inkDark/30 animate-bounce [animation-delay:300ms]" />
-                </span>
-              )}
+              {streamText
+                ? <FormattedText text={streamText} />
+                : (
+                  <span className="flex gap-1 items-center text-inkDark/40 py-1">
+                    <span className="w-2 h-2 rounded-full bg-inkDark/30 animate-bounce [animation-delay:0ms]" />
+                    <span className="w-2 h-2 rounded-full bg-inkDark/30 animate-bounce [animation-delay:150ms]" />
+                    <span className="w-2 h-2 rounded-full bg-inkDark/30 animate-bounce [animation-delay:300ms]" />
+                  </span>
+                )
+              }
             </div>
           </div>
         )}

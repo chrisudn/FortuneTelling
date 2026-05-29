@@ -6,6 +6,7 @@ import { getHexagramById, type Hexagram } from '@/lib/hexagram'
 import HexagramDisplay from '@/components/HexagramDisplay'
 import TrigramBadges from '@/components/TrigramBadges'
 import Toast, { useToast } from '@/components/Toast'
+import FormattedText from '@/components/FormattedText'
 
 const YAO_NAMES = ['初', '二', '三', '四', '五', '上']
 
@@ -177,7 +178,7 @@ export default function DiaryDetailPage() {
       {entry.aiFirstResponse && (
         <div className="bg-ink/5 rounded-2xl px-5 py-4 mb-4">
           <p className="text-ink text-sm font-bold tracking-widest mb-3">AI 解讀</p>
-          <p className="text-inkDark text-base leading-relaxed">{entry.aiFirstResponse}</p>
+          <FormattedText text={entry.aiFirstResponse} className="text-inkDark text-base leading-relaxed" />
         </div>
       )}
 
@@ -206,7 +207,10 @@ export default function DiaryDetailPage() {
                       ? 'bg-ink text-white rounded-br-sm'
                       : 'bg-white/80 text-inkDark border border-ink/10 rounded-bl-sm'
                     }`}>
-                    {msg.content}
+                    {msg.role === 'assistant'
+                      ? <FormattedText text={msg.content} />
+                      : msg.content
+                    }
                   </div>
                 </div>
               ))}

@@ -4,6 +4,32 @@
 
 ---
 
+## [0.3.0] — 2026-05-29　AI 對話強化 + 音效 + 文字排版
+
+### 新增
+
+**AI Prompt 強化**
+- `buildContext.ts`：之卦大象傳、動爻在之卦的爻辭補入 AI prompt，AI 對「變後走向」解讀更精準
+
+**AI 對話自動儲存（方案 A+B）**
+- `ChatSection` 新增 `onRoundComplete` callback，每輪 AI 回應完成後觸發（取代舊的 `onConversationEnd`）
+- 按「儲存此次占卜」時自動帶入截至當下的所有對話（`aiConversation`）
+- 儲存後繼續對話，每輪自動追加至日記（`updateDiaryEntry`，使用 `useRef` 避免 stale closure）
+- 移除「儲存對話至日記」獨立按鈕，操作合併為一步
+
+**AI 回應段落格式化**
+- `src/components/FormattedText.tsx`：`\n\n` 切段落 `<p>`、`\n` 轉 `<br>`，段落間 `mb-3` 間距
+- 套用至 `ChatSection` AI 氣泡（含 streaming 逐字顯示）
+- 套用至日記詳情頁 `aiFirstResponse` 及完整對話回顧
+
+**起卦頁硬幣敲擊音效**
+- Web Audio API 合成，零外部音效檔
+- 音色設計：噪音爆破（highpass 3500Hz，撞擊感）+ 正弦波金屬共鳴（2000→1200Hz，叮聲）
+- 三枚硬幣錯開 18ms 落地，模擬真實敲擊手感
+- 右上角 🔕 / 🔔 靜音按鈕，預設靜音，設定存 `localStorage`（`gua_yu_sound`）
+
+---
+
 ## [0.2.0] — 2026-05-29　卦象完整性 + 日記強化 + 月曆模式
 
 ### 新增
@@ -20,13 +46,12 @@
 - 日記詳情頁「儲存心情」加 Toast 反饋
 - 日記詳情頁（`/history/[id]`）補完整卦象資訊：卦辭、大象傳、上下卦象意、動爻爻辭、之卦完整說明
 
-**Sprint 5-C — AI 對話手動儲存**
+**Sprint 5-C — AI 對話儲存基礎建設**
 - `DiaryEntry` 新增選填欄位 `aiConversation?`，舊資料向後相容
 - `lib/diary.ts` 新增 `updateDiaryEntry()` 通用部分更新函數
-- `ChatSection` 新增 `onConversationEnd` callback，對話達上限後觸發
-- 匯出 `ChatMessage` 型別供外部使用
-- 結果頁對話結束後顯示「儲存對話至日記」按鈕
+- `ChatSection` 匯出 `ChatMessage` 型別供外部使用
 - 日記詳情頁顯示可折疊的「完整 AI 對話」區塊（AI 左氣泡 / 用戶右氣泡）
+- 注：儲存觸發機制於 0.3.0 改為自動追蹤（`onRoundComplete`）
 
 **Sprint 5-D — 日記月曆模式**
 - `src/components/DiaryCalendar.tsx`：純 React 月曆元件（不引入外部 library）
@@ -104,12 +129,12 @@
 
 ## 未來版本規劃
 
-### [0.2.0] — 後端與多裝置同步（未開始）
+### [0.4.0] — 後端與多裝置同步（未開始）
 - 正式用戶系統（Email / 手機號登入）
 - PostgreSQL 資料庫替代 localStorage
 - 多裝置資料同步
 
-### [0.3.0] — 進階功能（未開始）
+### [0.5.0] — 進階功能（未開始）
 - AI 解讀歷史趨勢分析（「你這個月常問感情問題…」）
 - 占卜結果生成圖片分享
 - 進階變爻解卦規則（6 爻全動、用九/用六）
