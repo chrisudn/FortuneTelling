@@ -4,6 +4,46 @@
 
 ---
 
+## [0.2.0] — 2026-05-29　卦象完整性 + 日記強化 + 月曆模式
+
+### 新增
+
+**Sprint 5-A — 結果頁卦象資訊強化**
+- `src/lib/trigram.ts`：八卦象意查詢模組（乾天/坤地/震雷/巽風/坎水/離火/艮山/兌澤）
+- `src/components/TrigramBadges.tsx`：上下卦象意標籤元件（本卦、之卦共用）
+- 結果頁本卦補上上下卦象意標籤
+- 之卦區塊補充：大象傳、動爻在之卦的對應爻辭、上下卦象意標籤
+
+**Sprint 5-B — 儲存反饋 + 日記詳情強化**
+- `src/components/Toast.tsx`：底部滑入 Toast 元件（含 `useToast` hook，2 秒自動消失）
+- 結果頁「儲存此次占卜」加 Toast 反饋
+- 日記詳情頁「儲存心情」加 Toast 反饋
+- 日記詳情頁（`/history/[id]`）補完整卦象資訊：卦辭、大象傳、上下卦象意、動爻爻辭、之卦完整說明
+
+**Sprint 5-C — AI 對話手動儲存**
+- `DiaryEntry` 新增選填欄位 `aiConversation?`，舊資料向後相容
+- `lib/diary.ts` 新增 `updateDiaryEntry()` 通用部分更新函數
+- `ChatSection` 新增 `onConversationEnd` callback，對話達上限後觸發
+- 匯出 `ChatMessage` 型別供外部使用
+- 結果頁對話結束後顯示「儲存對話至日記」按鈕
+- 日記詳情頁顯示可折疊的「完整 AI 對話」區塊（AI 左氣泡 / 用戶右氣泡）
+
+**Sprint 5-D — 日記月曆模式**
+- `src/components/DiaryCalendar.tsx`：純 React 月曆元件（不引入外部 library）
+  - 7 欄格（日一二三四五六），首日週日對齊
+  - 有記錄的日期顯示卦 unicode，多筆顯示數量
+  - 今日淡硃砂紅底色，選中日深墨綠底色
+- 歷史頁（`/history`）改版為上月曆、下篩選列表（方案 C）
+  - 點有記錄的日期 → 列表篩選當日；再點 → 取消篩選
+  - 切換月份 → 選中狀態清除，列表同步更新
+  - 分隔線動態顯示「M月 共 N 筆」或「M月D日 共 N 筆」
+
+### 技術變更
+- `history/page.tsx` 引入 `useMemo` 計算 `monthEntries` / `listEntries`，避免重複過濾
+- `TrigramBadges` 由結果頁內嵌函式抽出為獨立共用元件
+
+---
+
 ## [0.1.0] — 2026-05-29　MVP 完成
 
 首個完整可運作版本，包含完整占卜流程、AI 解讀對話、暱稱日記系統。

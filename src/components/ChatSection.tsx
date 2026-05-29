@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 
-interface ChatMessage {
+export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
 }
@@ -10,12 +10,14 @@ interface ChatSectionProps {
   hexagramContext: string
   maxRounds?: number
   onFirstResponse?: (response: string) => void
+  onConversationEnd?: (messages: ChatMessage[]) => void
 }
 
 export default function ChatSection({
   hexagramContext,
   maxRounds = 3,
   onFirstResponse,
+  onConversationEnd,
 }: ChatSectionProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -25,6 +27,7 @@ export default function ChatSection({
   const [error, setError] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const firstResponseFired = useRef(false)
+  const conversationEndFired = useRef(false)
 
   // 載入後自動觸發第一輪
   useEffect(() => { sendToAI([]) }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -62,14 +65,22 @@ export default function ChatSection({
       }
 
       const aiMessage: ChatMessage = { role: 'assistant', content: accumulated }
-      setMessages(prev => [...prev, aiMessage])
+      const nextMessages = [...history, aiMessage]
+      setMessages(nextMessages)
       setStreamText('')
-      setRound(r => r + 1)
+      const nextRound = round + 1
+      setRound(nextRound)
 
       // 第一輪完成後回傳給父元件（用於儲存日記）
       if (!firstResponseFired.current && onFirstResponse) {
         firstResponseFired.current = true
         onFirstResponse(accumulated)
+      }
+
+      // 達到對話上限時，回傳完整對話（用於手動儲存）
+      if (nextRound >= maxRounds && !conversationEndFired.current && onConversationEnd) {
+        conversationEndFired.current = true
+        onConversationEnd(nextMessages)
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : '發生未知錯誤，請稍後再試')

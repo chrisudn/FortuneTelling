@@ -17,6 +17,7 @@ export interface DiaryEntry {
   changingPositions: number[]
   hasChanges: boolean
   aiFirstResponse: string
+  aiConversation?: { role: 'user' | 'assistant'; content: string }[]
   note: string
   savedAt: number
   updatedAt: number
@@ -68,5 +69,13 @@ export function updateDiaryNote(id: string, note: string): void {
   const idx = entries.findIndex(e => e.id === id)
   if (idx === -1) return
   entries[idx] = { ...entries[idx], note, updatedAt: Date.now() }
+  localStorage.setItem(DIARY_KEY, JSON.stringify(entries))
+}
+
+export function updateDiaryEntry(id: string, updates: Partial<Omit<DiaryEntry, 'id' | 'savedAt'>>): void {
+  const entries = getDiaryEntries()
+  const idx = entries.findIndex(e => e.id === id)
+  if (idx === -1) return
+  entries[idx] = { ...entries[idx], ...updates, updatedAt: Date.now() }
   localStorage.setItem(DIARY_KEY, JSON.stringify(entries))
 }

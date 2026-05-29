@@ -1,8 +1,13 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getDiaryEntries, getProfile, type DiaryEntry } from '@/lib/diary'
 import NavBar from '@/components/NavBar'
+import DiaryCalendar from '@/components/DiaryCalendar'
+
+function localDateKey(date: Date): string {
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
+}
 
 function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString('zh-TW', {
@@ -15,12 +20,46 @@ export default function HistoryPage() {
   const [entries, setEntries] = useState<DiaryEntry[]>([])
   const [hasProfile, setHasProfile] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const now = new Date()
+    return new Date(now.getFullYear(), now.getMonth(), 1)
+  })
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
   useEffect(() => {
     setHasProfile(!!getProfile())
     setEntries(getDiaryEntries())
     setLoaded(true)
   }, [])
+
+  // Entries within the current calendar month
+  const monthEntries = useMemo(() =>
+    entries.filter(e => {
+      const d = new Date(e.savedAt)
+      return d.getFullYear() === currentMonth.getFullYear()
+        && d.getMonth() === currentMonth.getMonth()
+    }),
+  [entries, currentMonth])
+
+  // Entries shown in the list below the calendar
+  const listEntries = useMemo(() => {
+    if (!selectedDate) return monthEntries
+    return entries.filter(e =>
+      localDateKey(new Date(e.savedAt)) === selectedDate
+    )
+  }, [entries, monthEntries, selectedDate])
+
+  // Label for the divider between calendar and list
+  const listLabel = useMemo(() => {
+    if (!selectedDate) {
+      return `${currentMonth.getMonth() + 1}月　共 ${monthEntries.length} 筆`
+    }
+    const [y, m, d] = selectedDate.split('-').map(Number)
+    const label = new Date(y, m, d).toLocaleDateString('zh-TW', {
+      month: 'long', day: 'numeric',
+    })
+    return `${label}　共 ${listEntries.length} 筆`
+  }, [selectedDate, currentMonth, monthEntries.length, listEntries.length])
 
   if (!loaded) return null
 
@@ -44,22 +83,47 @@ export default function HistoryPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen px-6 py-8 bg-paper pb-28">
-      <h1 className="text-3xl font-bold text-ink mb-6">占卜歷史</h1>
+    <div className="flex flex-col min-h-screen px-5 py-6 bg-paper pb-28">
 
-      {entries.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3">
-          <p className="text-inkDark/40 text-xl">尚無占卜紀錄</p>
-          <button
-            onClick={() => router.push('/')}
-            className="text-vermilion text-lg font-medium mt-2"
-          >
-            前往起卦 →
-          </button>
+      {/* 頁面標題 */}
+      <h1 className="text-2xl font-bold text-ink mb-4">占卜日記</h1>
+
+      {/* 月曆 */}
+      <div className="mb-4">
+        <DiaryCalendar
+          entries={entries}
+          currentMonth={currentMonth}
+          selectedDate={selectedDate}
+          onMonthChange={setCurrentMonth}
+          onSelectDate={setSelectedDate}
+        />
+      </div>
+
+      {/* 分隔 + 統計 */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="flex-1 h-px bg-ink/10" />
+        <span className="text-inkDark/40 text-sm whitespace-nowrap">{listLabel}</span>
+        <div className="flex-1 h-px bg-ink/10" />
+      </div>
+
+      {/* 記錄列表 */}
+      {listEntries.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 py-8">
+          <p className="text-inkDark/30 text-base">
+            {selectedDate ? '此日無占卜紀錄' : '本月尚無占卜紀錄'}
+          </p>
+          {!selectedDate && entries.length === 0 && (
+            <button
+              onClick={() => router.push('/')}
+              className="text-vermilion text-base font-medium"
+            >
+              前往起卦 →
+            </button>
+          )}
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          {entries.map(entry => (
+          {listEntries.map(entry => (
             <button
               key={entry.id}
               onClick={() => router.push(`/history/${entry.id}`)}
@@ -82,7 +146,7 @@ export default function HistoryPage() {
                     )}
                   </div>
                   <p className="text-inkDark/60 text-base truncate">{entry.question}</p>
-                  <p className="text-inkDark/60 text-base mt-1">{formatDate(entry.savedAt)}</p>
+                  <p className="text-inkDark/40 text-sm mt-1">{formatDate(entry.savedAt)}</p>
                 </div>
               </div>
               {entry.note && (

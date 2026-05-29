@@ -3,11 +3,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { loadCastSession, type CastSession } from '@/lib/storage'
 import { buildReadingResult, type ReadingResult } from '@/lib/hexagram'
-import { getProfile, getDiaryEntries, saveDiaryEntry } from '@/lib/diary'
+import { getProfile, getDiaryEntries, saveDiaryEntry, updateDiaryEntry } from '@/lib/diary'
 import { buildHexagramContext } from '@/lib/buildContext'
 import HexagramDisplay from '@/components/HexagramDisplay'
 import ChatSection from '@/components/ChatSection'
 import NavBar from '@/components/NavBar'
+import TrigramBadges from '@/components/TrigramBadges'
+import Toast, { useToast } from '@/components/Toast'
+import type { ChatMessage } from '@/components/ChatSection'
 
 const YAO_NAMES = ['初', '二', '三', '四', '五', '上']
 
@@ -20,6 +23,9 @@ export default function ResultPage() {
   const [hasProfile, setHasProfile] = useState(false)
   const [savedEntryId, setSavedEntryId] = useState<string | null>(null)
   const [aiFirstResponse, setAiFirstResponse] = useState('')
+  const [endedConversation, setEndedConversation] = useState<ChatMessage[] | null>(null)
+  const [conversationSaved, setConversationSaved] = useState(false)
+  const toast = useToast()
 
   useEffect(() => {
     const s = loadCastSession()
@@ -31,12 +37,22 @@ export default function ResultPage() {
     setHasProfile(!!getProfile())
   }, [router])
 
-  // 組裝 AI Context（暱稱用戶附帶歷史）
   const hexagramContext = useMemo(() => {
     if (!session || !reading) return ''
     const recentEntries = hasProfile ? getDiaryEntries().slice(0, 3) : undefined
     return buildHexagramContext(session, reading, recentEntries)
   }, [session, reading, hasProfile])
+
+  const handleSaveConversation = () => {
+    if (!endedConversation || conversationSaved) return
+    if (!savedEntryId) {
+      toast.show('請先儲存此次占卜')
+      return
+    }
+    updateDiaryEntry(savedEntryId, { aiConversation: endedConversation })
+    setConversationSaved(true)
+    toast.show('✓ 對話已儲存至日記')
+  }
 
   const handleSave = () => {
     if (!session || !reading || savedEntryId) return
@@ -55,6 +71,7 @@ export default function ResultPage() {
       aiFirstResponse,
     })
     setSavedEntryId(entry.id)
+    toast.show('✓ 已儲存至日記')
   }
 
   if (!session || !reading) {
@@ -88,7 +105,11 @@ export default function ResultPage() {
           <h2 className="text-4xl font-bold text-ink tracking-wide mb-1">
             {mainHexagram.unicode} {mainHexagram.name}卦
           </h2>
-          <p className="text-inkDark/50 text-base">{mainHexagram.keyword}</p>
+          <p className="text-inkDark/50 text-base mb-3">{mainHexagram.keyword}</p>
+          <TrigramBadges
+            upper={mainHexagram.upperTrigram}
+            lower={mainHexagram.lowerTrigram}
+          />
         </div>
       </div>
 
@@ -125,18 +146,56 @@ export default function ResultPage() {
       {changedHexagram && (
         <div className="bg-ink/5 rounded-2xl px-5 py-4 mb-4">
           <p className="text-ink text-sm font-bold tracking-widest mb-3">之　卦（變後走向）</p>
-          <div className="flex items-center gap-5">
+
+          {/* 卦象 + 卦名 */}
+          <div className="flex items-center gap-5 mb-3">
             <HexagramDisplay lines={session.changedLines} size="sm" />
             <div>
               <p className="text-2xl font-bold text-ink">
                 {changedHexagram.unicode} {changedHexagram.name}卦
               </p>
               <p className="text-inkDark/60 text-base mt-0.5">{changedHexagram.keyword}</p>
-              <p className="text-inkDark/70 text-base mt-1 leading-relaxed line-clamp-2">
-                {changedHexagram.guaCi}
-              </p>
+              <div className="mt-1.5">
+                <TrigramBadges
+                  upper={changedHexagram.upperTrigram}
+                  lower={changedHexagram.lowerTrigram}
+                  size="sm"
+                />
+              </div>
             </div>
           </div>
+
+          {/* 卦辭 */}
+          <p className="text-inkDark/80 text-base leading-relaxed mb-3">
+            {changedHexagram.guaCi}
+          </p>
+
+          {/* 大象傳 */}
+          <div className="border-t border-ink/10 pt-3 mb-3">
+            <p className="text-inkDark/40 text-sm tracking-widest mb-1">大象傳</p>
+            <p className="text-inkDark/70 text-base leading-relaxed">{changedHexagram.image}</p>
+          </div>
+
+          {/* 動爻在之卦的爻辭 */}
+          {session.changingPositions.length > 0 && (
+            <div className="border-t border-ink/10 pt-3">
+              <p className="text-vermilion text-sm font-bold tracking-widest mb-2">
+                動爻在之卦（{session.changingPositions.map(p => YAO_NAMES[p] + '爻').join('、')}）
+              </p>
+              <div className="flex flex-col gap-2">
+                {session.changingPositions.map(pos => {
+                  const yao = changedHexagram.yaoCi[pos]
+                  if (!yao) return null
+                  return (
+                    <div key={pos}>
+                      <span className="text-vermilion font-bold text-base">{yao.position}　</span>
+                      <span className="text-inkDark text-base leading-relaxed">{yao.text}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -197,7 +256,22 @@ export default function ResultPage() {
             hexagramContext={hexagramContext}
             maxRounds={hasProfile ? 10 : 3}
             onFirstResponse={setAiFirstResponse}
+            onConversationEnd={setEndedConversation}
           />
+
+          {/* 對話結束後：手動儲存對話按鈕 */}
+          {endedConversation && !conversationSaved && (
+            <button
+              onClick={handleSaveConversation}
+              className="w-full py-4 rounded-xl text-base font-medium text-ink
+                         border-2 border-ink/20 active:bg-ink/5 transition-colors mt-2"
+            >
+              儲存對話至日記
+            </button>
+          )}
+          {conversationSaved && (
+            <p className="text-center text-inkDark/40 text-sm mt-2">✓ 對話已儲存</p>
+          )}
         </div>
       )}
 
@@ -237,6 +311,7 @@ export default function ResultPage() {
       </button>
 
       <NavBar />
+      <Toast message={toast.message} visible={toast.visible} />
     </div>
   )
 }
