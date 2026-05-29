@@ -41,6 +41,9 @@
 - `@supabase/ssr` 0.x（Server Component + Route Handler + Middleware）
 - 訪客模式完整保留，localStorage 與 Supabase 雙軌並行
 
+### 修正
+- Profile 頁「占卜紀錄」筆數：已登入時改從 Supabase 讀取，修正原本固定讀 localStorage 的問題
+
 ---
 
 ## [0.3.0] — 2026-05-29　AI 對話強化 + 音效 + 文字排版

@@ -18,15 +18,27 @@ export default function ProfilePage() {
   const toast = useToast()
 
   useEffect(() => {
-    setEntryCount(getDiaryEntries().length)
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       const user = data.user ?? null
       setAuthUser(user)
-      // 已登入但尚未設雲端暱稱 → 預填本機暱稱
-      if (user && !user.user_metadata?.nickname) {
-        const local = getProfile()
-        if (local?.nickname) setNickname(local.nickname)
+
+      if (user) {
+        // 已登入 → 從 Supabase 讀取筆數
+        if (!user.user_metadata?.nickname) {
+          const local = getProfile()
+          if (local?.nickname) setNickname(local.nickname)
+        }
+        try {
+          const res = await fetch('/api/diary')
+          if (res.ok) {
+            const entries = await res.json()
+            setEntryCount(entries.length)
+          }
+        } catch {}
+      } else {
+        // 未登入 → 從 localStorage 讀取
+        setEntryCount(getDiaryEntries().length)
       }
     })
   }, [])
