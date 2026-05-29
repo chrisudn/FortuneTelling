@@ -5,6 +5,7 @@ import { loadCastSession, type CastSession } from '@/lib/storage'
 import { buildReadingResult, type ReadingResult } from '@/lib/hexagram'
 import { getProfile, getDiaryEntries, saveDiaryEntry, updateDiaryEntry } from '@/lib/diary'
 import { buildHexagramContext } from '@/lib/buildContext'
+import { createClient } from '@/lib/supabase/client'
 import HexagramDisplay from '@/components/HexagramDisplay'
 import ChatSection from '@/components/ChatSection'
 import NavBar from '@/components/NavBar'
@@ -21,7 +22,11 @@ export default function ResultPage() {
   const [showAllYaoCi, setShowAllYaoCi] = useState(false)
   const [showChat, setShowChat] = useState(false)
   const [hasProfile, setHasProfile] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const isLoggedInRef = useRef(false)
+  const [recentEntries, setRecentEntries] = useState<import('@/lib/diary').DiaryEntry[] | undefined>(undefined)
   const [savedEntryId, setSavedEntryId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
   const savedEntryIdRef = useRef<string | null>(null)
   const [aiFirstResponse, setAiFirstResponse] = useState('')
   const [liveMessages, setLiveMessages] = useState<ChatMessage[]>([])
@@ -34,27 +39,48 @@ export default function ResultPage() {
     const r = buildReadingResult(s.mainLines, s.changedLines, s.changingPositions)
     if (!r) { router.replace('/'); return }
     setReading(r)
-    setHasProfile(!!getProfile())
+    const localProfile = !!getProfile()
+    setHasProfile(localProfile)
+    createClient().auth.getUser().then(async ({ data }) => {
+      if (data.user) {
+        setIsLoggedIn(true)
+        isLoggedInRef.current = true
+        setHasProfile(true)
+        try {
+          const res = await fetch('/api/diary?limit=3')
+          if (res.ok) setRecentEntries(await res.json())
+        } catch {}
+      } else if (getProfile()) {
+        setRecentEntries(getDiaryEntries().slice(0, 3))
+      }
+    })
   }, [router])
 
   const hexagramContext = useMemo(() => {
     if (!session || !reading) return ''
-    const recentEntries = hasProfile ? getDiaryEntries().slice(0, 3) : undefined
-    return buildHexagramContext(session, reading, recentEntries)
-  }, [session, reading, hasProfile])
+    return buildHexagramContext(session, reading, hasProfile ? recentEntries : undefined)
+  }, [session, reading, hasProfile, recentEntries])
 
   // 每輪 AI 回應完成後：更新 liveMessages，若已存日記則自動追加對話
   const handleRoundComplete = useCallback((messages: ChatMessage[]) => {
     setLiveMessages(messages)
-    if (savedEntryIdRef.current) {
+    if (!savedEntryIdRef.current) return
+    if (isLoggedInRef.current) {
+      fetch(`/api/diary/${savedEntryIdRef.current}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aiConversation: messages }),
+      }).catch(() => {})
+    } else {
       updateDiaryEntry(savedEntryIdRef.current, { aiConversation: messages })
     }
   }, [])
 
-  const handleSave = () => {
-    if (!session || !reading || savedEntryId) return
+  const handleSave = async () => {
+    if (!session || !reading || savedEntryId || saving) return
+    setSaving(true)
     const { mainHexagram, changedHexagram } = reading
-    const entry = saveDiaryEntry({
+    const payload = {
       question: session.question,
       mainHexagramId: mainHexagram.id,
       mainHexagramName: mainHexagram.name,
@@ -67,10 +93,32 @@ export default function ResultPage() {
       hasChanges: session.hasChanges,
       aiFirstResponse,
       aiConversation: liveMessages.length > 0 ? liveMessages : undefined,
-    })
+    }
+
+    if (isLoggedIn) {
+      try {
+        const res = await fetch('/api/diary', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        if (res.ok) {
+          const entry = await res.json()
+          savedEntryIdRef.current = entry.id
+          setSavedEntryId(entry.id)
+          toast.show('✓ 已儲存至日記')
+          setSaving(false)
+          return
+        }
+      } catch {}
+      // Supabase 失敗時 fallback 到 localStorage
+    }
+
+    const entry = saveDiaryEntry(payload)
     savedEntryIdRef.current = entry.id
     setSavedEntryId(entry.id)
     toast.show('✓ 已儲存至日記')
+    setSaving(false)
   }
 
   if (!session || !reading) {
@@ -264,7 +312,7 @@ export default function ResultPage() {
       {hasProfile && (
         <button
           onClick={handleSave}
-          disabled={!!savedEntryId}
+          disabled={!!savedEntryId || saving}
           className={`w-full py-5 rounded-xl text-xl font-bold mb-4
                       transition-all active:scale-[0.98]
                       ${savedEntryId
@@ -272,7 +320,7 @@ export default function ResultPage() {
                         : 'bg-ink text-white'
                       }`}
         >
-          {savedEntryId ? '✓ 已儲存至日記' : '儲存此次占卜'}
+          {savedEntryId ? '✓ 已儲存至日記' : saving ? '儲存中…' : '儲存此次占卜'}
         </button>
       )}
 

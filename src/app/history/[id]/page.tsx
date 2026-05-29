@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { getDiaryEntryById, updateDiaryNote, type DiaryEntry } from '@/lib/diary'
+import { createClient } from '@/lib/supabase/client'
 import { getHexagramById, type Hexagram } from '@/lib/hexagram'
 import HexagramDisplay from '@/components/HexagramDisplay'
 import TrigramBadges from '@/components/TrigramBadges'
@@ -18,22 +19,44 @@ export default function DiaryDetailPage() {
   const [changedHex, setChangedHex] = useState<Hexagram | null>(null)
   const [note, setNote] = useState('')
   const [showConversation, setShowConversation] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const toast = useToast()
 
   useEffect(() => {
-    const e = getDiaryEntryById(params.id as string)
-    if (!e) { router.replace('/history'); return }
-    setEntry(e)
-    setNote(e.note)
-    setMainHex(getHexagramById(e.mainHexagramId) ?? null)
-    if (e.changedHexagramId) {
-      setChangedHex(getHexagramById(e.changedHexagramId) ?? null)
-    }
+    const id = params.id as string
+    const supabase = createClient()
+    supabase.auth.getUser().then(async ({ data }) => {
+      let e: DiaryEntry | null = null
+      if (data.user) {
+        setIsLoggedIn(true)
+        try {
+          const res = await fetch(`/api/diary/${id}`)
+          if (res.ok) e = await res.json()
+        } catch {}
+      } else {
+        e = getDiaryEntryById(id)
+      }
+      if (!e) { router.replace('/history'); return }
+      setEntry(e)
+      setNote(e.note)
+      setMainHex(getHexagramById(e.mainHexagramId) ?? null)
+      if (e.changedHexagramId) {
+        setChangedHex(getHexagramById(e.changedHexagramId) ?? null)
+      }
+    })
   }, [params.id, router])
 
-  const handleSaveNote = () => {
+  const handleSaveNote = async () => {
     if (!entry) return
-    updateDiaryNote(entry.id, note)
+    if (isLoggedIn) {
+      await fetch(`/api/diary/${entry.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note }),
+      })
+    } else {
+      updateDiaryNote(entry.id, note)
+    }
     toast.show('✓ 心情已儲存')
   }
 

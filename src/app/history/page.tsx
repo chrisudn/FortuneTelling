@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getDiaryEntries, getProfile, type DiaryEntry } from '@/lib/diary'
+import { createClient } from '@/lib/supabase/client'
 import NavBar from '@/components/NavBar'
 import DiaryCalendar from '@/components/DiaryCalendar'
 
@@ -27,12 +28,22 @@ export default function HistoryPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
   useEffect(() => {
-    setHasProfile(!!getProfile())
-    setEntries(getDiaryEntries())
-    setLoaded(true)
+    const supabase = createClient()
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (data.user) {
+        setHasProfile(true)
+        try {
+          const res = await fetch('/api/diary')
+          if (res.ok) setEntries(await res.json())
+        } catch {}
+      } else {
+        setHasProfile(!!getProfile())
+        setEntries(getDiaryEntries())
+      }
+      setLoaded(true)
+    })
   }, [])
 
-  // Entries within the current calendar month
   const monthEntries = useMemo(() =>
     entries.filter(e => {
       const d = new Date(e.savedAt)
@@ -41,7 +52,6 @@ export default function HistoryPage() {
     }),
   [entries, currentMonth])
 
-  // Entries shown in the list below the calendar
   const listEntries = useMemo(() => {
     if (!selectedDate) return monthEntries
     return entries.filter(e =>
@@ -49,7 +59,6 @@ export default function HistoryPage() {
     )
   }, [entries, monthEntries, selectedDate])
 
-  // Label for the divider between calendar and list
   const listLabel = useMemo(() => {
     if (!selectedDate) {
       return `${currentMonth.getMonth() + 1}月　共 ${monthEntries.length} 筆`
@@ -85,10 +94,8 @@ export default function HistoryPage() {
   return (
     <div className="flex flex-col min-h-screen px-5 py-6 bg-paper pb-28">
 
-      {/* 頁面標題 */}
       <h1 className="text-2xl font-bold text-ink mb-4">占卜日記</h1>
 
-      {/* 月曆 */}
       <div className="mb-4">
         <DiaryCalendar
           entries={entries}
@@ -99,14 +106,12 @@ export default function HistoryPage() {
         />
       </div>
 
-      {/* 分隔 + 統計 */}
       <div className="flex items-center gap-3 mb-4">
         <div className="flex-1 h-px bg-ink/10" />
         <span className="text-inkDark/40 text-sm whitespace-nowrap">{listLabel}</span>
         <div className="flex-1 h-px bg-ink/10" />
       </div>
 
-      {/* 記錄列表 */}
       {listEntries.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-8">
           <p className="text-inkDark/30 text-base">

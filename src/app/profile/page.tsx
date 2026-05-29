@@ -1,37 +1,111 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { getProfile, saveProfile, getDiaryEntries, type UserProfile } from '@/lib/diary'
+import { getProfile, saveProfile, getDiaryEntries } from '@/lib/diary'
+import { createClient } from '@/lib/supabase/client'
 import NavBar from '@/components/NavBar'
+import Toast, { useToast } from '@/components/Toast'
+import type { User } from '@supabase/supabase-js'
 
 export default function ProfilePage() {
   const router = useRouter()
-  const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [nickname, setNickname] = useState('')
+  // undefined = 仍在確認 auth 狀態
+  const [authUser, setAuthUser] = useState<User | null | undefined>(undefined)
   const [entryCount, setEntryCount] = useState(0)
-  const [loaded, setLoaded] = useState(false)
+  const [nickname, setNickname] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const toast = useToast()
 
   useEffect(() => {
-    setProfile(getProfile())
     setEntryCount(getDiaryEntries().length)
-    setLoaded(true)
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => {
+      const user = data.user ?? null
+      setAuthUser(user)
+      // 已登入但尚未設雲端暱稱 → 預填本機暱稱
+      if (user && !user.user_metadata?.nickname) {
+        const local = getProfile()
+        if (local?.nickname) setNickname(local.nickname)
+      }
+    })
   }, [])
 
-  const handleCreate = () => {
-    const name = nickname.trim()
-    if (!name) return
-    setProfile(saveProfile(name))
+  const handleLogout = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    setAuthUser(null)
   }
 
-  if (!loaded) return null
+  const handleCreateNickname = async () => {
+    const name = nickname.trim()
+    if (!name || saving) return
+    setSaving(true)
+    setSaveError('')
+
+    if (authUser) {
+      const supabase = createClient()
+      const { data, error } = await supabase.auth.updateUser({ data: { nickname: name } })
+      if (error) {
+        setSaveError('儲存失敗，請稍後再試')
+        setSaving(false)
+        return
+      }
+      if (data.user) setAuthUser(data.user)
+      saveProfile(name) // 保持 localStorage 同步，供其他頁面暫時使用
+      toast.show('✓ 已同步至雲端')
+    } else {
+      saveProfile(name)
+      toast.show('✓ 暱稱已儲存')
+    }
+
+    setSaving(false)
+    setNickname('')
+  }
+
+  if (authUser === undefined) return null
+
+  // 顯示用的衍生值
+  const isLoggedIn = !!authUser
+  const cloudNickname = authUser?.user_metadata?.nickname as string | undefined
+  const localNickname = getProfile()?.nickname
+  const displayNickname = isLoggedIn ? cloudNickname : localNickname
+  const hasNickname = !!displayNickname
+  const joinDate = isLoggedIn
+    ? new Date(authUser.created_at)
+    : getProfile() ? new Date(getProfile()!.createdAt) : new Date()
 
   return (
     <div className="flex flex-col min-h-screen px-6 py-8 bg-paper pb-28">
-      <h1 className="text-3xl font-bold text-ink mb-8">我的</h1>
+      <h1 className="text-3xl font-bold text-ink mb-6">我的</h1>
 
-      {!profile ? (
+      {/* 雲端帳號狀態 */}
+      {isLoggedIn ? (
+        <div className="flex items-center justify-between bg-ink/5 rounded-2xl px-5 py-4 mb-6">
+          <div>
+            <p className="text-ink text-sm font-bold mb-0.5">已登入</p>
+            <p className="text-inkDark/60 text-sm">{authUser.email}</p>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="text-inkDark/50 text-sm border border-ink/15 rounded-lg px-3 py-1.5 active:bg-ink/5"
+          >
+            登出
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => router.push('/login')}
+          className="w-full text-left bg-vermilion/5 border border-vermilion/20 rounded-2xl px-5 py-4 mb-6 active:bg-vermilion/10"
+        >
+          <p className="text-vermilion text-sm font-bold mb-0.5">登入以同步占卜日記</p>
+          <p className="text-inkDark/50 text-sm">換裝置也能看到所有記錄 →</p>
+        </button>
+      )}
+
+      {/* 暱稱區塊 */}
+      {!hasNickname ? (
         <div className="flex flex-col gap-6">
-          {/* 說明 */}
           <div className="bg-ink/5 rounded-2xl p-5">
             <p className="text-inkDark text-xl font-medium mb-3">建立暱稱後可以：</p>
             <ul className="text-inkDark/70 text-lg leading-loose space-y-1">
@@ -43,9 +117,7 @@ export default function ProfilePage() {
           </div>
 
           <div>
-            <label className="block text-ink text-xl font-medium mb-3">
-              請輸入你的暱稱
-            </label>
+            <label className="block text-ink text-xl font-medium mb-3">請輸入你的暱稱</label>
             <input
               type="text"
               className="w-full rounded-xl border-2 border-ink/30 bg-white/60
@@ -54,18 +126,22 @@ export default function ProfilePage() {
                          placeholder:text-inkDark/30"
               placeholder="例：阿明、小玉…"
               value={nickname}
-              onChange={e => setNickname(e.target.value)}
+              onChange={e => { setNickname(e.target.value); setSaveError('') }}
               maxLength={20}
             />
           </div>
 
+          {saveError && (
+            <p className="text-red-600 text-sm bg-red-50 rounded-xl px-4 py-3">{saveError}</p>
+          )}
+
           <button
-            onClick={handleCreate}
-            disabled={!nickname.trim()}
+            onClick={handleCreateNickname}
+            disabled={!nickname.trim() || saving}
             className="w-full py-5 rounded-xl text-2xl font-bold text-white
                        bg-vermilion disabled:opacity-40 active:scale-[0.98] transition-transform"
           >
-            建立暱稱
+            {saving ? '儲存中…' : '建立暱稱'}
           </button>
         </div>
       ) : (
@@ -74,13 +150,20 @@ export default function ProfilePage() {
           <div className="bg-ink/5 rounded-2xl p-5 flex items-center gap-4">
             <div className="w-16 h-16 rounded-full bg-ink/15 flex items-center justify-center flex-shrink-0">
               <span className="text-3xl font-bold text-ink">
-                {profile.nickname.slice(0, 1)}
+                {displayNickname!.slice(0, 1)}
               </span>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-ink">{profile.nickname}</p>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-2xl font-bold text-ink truncate">{displayNickname}</p>
+                {isLoggedIn && (
+                  <span className="text-xs text-inkDark/40 bg-ink/8 rounded-full px-2 py-0.5 whitespace-nowrap flex-shrink-0">
+                    ☁ 雲端
+                  </span>
+                )}
+              </div>
               <p className="text-inkDark/40 text-base mt-0.5">
-                {new Date(profile.createdAt).toLocaleDateString('zh-TW', {
+                {joinDate.toLocaleDateString('zh-TW', {
                   year: 'numeric', month: 'long', day: 'numeric',
                 })} 加入
               </p>
@@ -111,12 +194,12 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* 版本號 */}
       <p className="text-center text-inkDark/25 text-sm pt-8 pb-2 select-none">
         v{process.env.NEXT_PUBLIC_APP_VERSION}
       </p>
 
       <NavBar />
+      <Toast message={toast.message} visible={toast.visible} />
     </div>
   )
 }

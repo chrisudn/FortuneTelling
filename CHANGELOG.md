@@ -4,6 +4,45 @@
 
 ---
 
+## [0.4.0] — 2026-05-29　Supabase Auth + 多裝置同步
+
+### 新增
+
+**Sprint 1 — Supabase 基礎 + 登入頁**
+- Supabase Auth 整合（`@supabase/ssr`）
+- `/login` 頁面：Email 魔法連結、Email + 密碼（含忘記密碼）
+- `/auth/callback` route：處理登入連結跳轉
+- Next.js middleware：自動刷新 session token
+- `diary_entries` PostgreSQL 資料表 + Row Level Security
+
+**Sprint 2 — Auth 狀態整合到 UI**
+- Profile 頁整合 Supabase Auth 狀態（已登入顯示 email + 登出按鈕）
+- 暱稱儲存至 Supabase `user_metadata`（跨裝置保留）
+- 未登入顯示「登入以同步占卜日記」引導
+- 暱稱卡片顯示「☁ 雲端」標籤，區分資料來源
+- `/result` 頁：登入用戶享有儲存與 AI 10 輪對話
+
+**Sprint 3 — 日記寫入 Supabase**
+- `POST /api/diary`：占卜記錄寫入 Supabase（需驗證登入）
+- `PATCH /api/diary/[id]`：更新 AI 對話與心情筆記
+- 已登入時「儲存此次占卜」存至 Supabase；未登入繼續存 localStorage
+- Supabase 失敗時自動 fallback 至 localStorage
+
+**Sprint 4 — 日記讀取 + 多裝置同步**
+- `GET /api/diary`：讀取全部日記記錄（支援 `?limit=N`）
+- `GET /api/diary/[id]`：讀取單筆記錄
+- `/history` 列表：已登入時從 Supabase 讀取，未登入從 localStorage
+- `/history/[id]` 詳情：同上；心情筆記修改即時同步
+- AI 解讀上下文（最近 3 筆）：已登入時從 Supabase 讀取，多裝置一致
+
+### 技術規格新增
+- Supabase PostgreSQL（`diary_entries` table + RLS）
+- Supabase Auth（Magic Link + Email/Password）
+- `@supabase/ssr` 0.x（Server Component + Route Handler + Middleware）
+- 訪客模式完整保留，localStorage 與 Supabase 雙軌並行
+
+---
+
 ## [0.3.0] — 2026-05-29　AI 對話強化 + 音效 + 文字排版
 
 ### 新增
@@ -128,11 +167,6 @@
 ---
 
 ## 未來版本規劃
-
-### [0.4.0] — 後端與多裝置同步（未開始）
-- 正式用戶系統（Email / 手機號登入）
-- PostgreSQL 資料庫替代 localStorage
-- 多裝置資料同步
 
 ### [0.5.0] — 進階功能（未開始）
 - AI 解讀歷史趨勢分析（「你這個月常問感情問題…」）
