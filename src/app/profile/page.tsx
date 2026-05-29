@@ -111,6 +111,11 @@ export default function ProfilePage() {
         </div>
       )}
 
+      {/* 版本號 */}
+      <p className="text-center text-inkDark/25 text-sm pt-8 pb-2 select-none">
+        v{process.env.NEXT_PUBLIC_APP_VERSION}
+      </p>
+
       <NavBar />
     </div>
   )

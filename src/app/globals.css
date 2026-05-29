@@ -33,3 +33,48 @@ body {
 input, textarea, select {
   font-size: max(16px, 1em);
 }
+
+/* ── 硬幣 3D 翻面動畫 ─────────────────────────────── */
+.coin-wrap {
+  perspective: 500px;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+}
+.coin-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.52s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.coin-inner.flipped {
+  transform: rotateY(180deg);
+}
+.coin-side {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+/* 背面（翻轉前） */
+.coin-back {
+  background-color: rgba(61, 43, 31, 0.10);
+  border: 2px solid rgba(61, 43, 31, 0.20);
+}
+/* 正面陽（翻轉後） */
+.coin-yang {
+  background-color: rgba(250, 243, 224, 0.95);
+  border: 2px solid rgba(192, 57, 43, 0.50);
+  transform: rotateY(180deg);
+}
+/* 正面陰（翻轉後） */
+.coin-yin {
+  background-color: rgba(26, 60, 52, 0.80);
+  border: 2px solid rgba(26, 60, 52, 0.90);
+  transform: rotateY(180deg);
+}
