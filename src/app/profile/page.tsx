@@ -11,7 +11,7 @@ export default function ProfilePage() {
   const router = useRouter()
   // undefined = 仍在確認 auth 狀態
   const [authUser, setAuthUser] = useState<User | null | undefined>(undefined)
-  const [entryCount, setEntryCount] = useState(0)
+  const [entryCount, setEntryCount] = useState(() => getDiaryEntries().length)
   const [nickname, setNickname] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
@@ -30,12 +30,16 @@ export default function ProfilePage() {
           if (local?.nickname) setNickname(local.nickname)
         }
         try {
-          const res = await fetch('/api/diary')
+          const res = await fetch('/api/diary/count')
           if (res.ok) {
-            const entries = await res.json()
-            setEntryCount(entries.length)
+            const { count } = await res.json()
+            setEntryCount(count)
+          } else {
+            setEntryCount(getDiaryEntries().length)
           }
-        } catch {}
+        } catch {
+          setEntryCount(getDiaryEntries().length)
+        }
       } else {
         // 未登入 → 從 localStorage 讀取
         setEntryCount(getDiaryEntries().length)
@@ -47,6 +51,7 @@ export default function ProfilePage() {
     const supabase = createClient()
     await supabase.auth.signOut()
     setAuthUser(null)
+    setEntryCount(getDiaryEntries().length)
   }
 
   const handleCreateNickname = async () => {
@@ -80,12 +85,13 @@ export default function ProfilePage() {
   // 顯示用的衍生值
   const isLoggedIn = !!authUser
   const cloudNickname = authUser?.user_metadata?.nickname as string | undefined
-  const localNickname = getProfile()?.nickname
+  const localProfile = getProfile()
+  const localNickname = localProfile?.nickname
   const displayNickname = isLoggedIn ? cloudNickname : localNickname
   const hasNickname = !!displayNickname
   const joinDate = isLoggedIn
     ? new Date(authUser.created_at)
-    : getProfile() ? new Date(getProfile()!.createdAt) : new Date()
+    : localProfile ? new Date(localProfile.createdAt) : new Date()
 
   return (
     <div className="flex flex-col min-h-screen px-6 py-8 bg-paper pb-28">
