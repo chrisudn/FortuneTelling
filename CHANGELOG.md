@@ -4,6 +4,19 @@
 
 ---
 
+## [0.4.2] — 2026-08-24　SEO 基礎建設
+
+### 新增
+- `robots.ts`：動態產生 `robots.txt`，允許 `/`、`/login` 被索引，排除依賴 session/登入狀態的 `/cast`、`/result`、`/history`、`/profile`、`/api/`、`/auth/`
+- `sitemap.ts`：動態產生 `sitemap.xml`，收錄首頁與登入頁
+- `layout.tsx`：補齊 `metadataBase`、標題樣板、`keywords`、`openGraph`、`twitter`、`alternates.canonical`、`robots` 等 SEO metadata
+- `icon.svg`：新增網站 favicon（品牌墨綠底、宣紙色「卦」字）
+
+### 已知取捨
+- 原規劃用 `next/og` 的 `ImageResponse` 動態產生 favicon 與 OG 分享圖，但在 Windows 本機 `next build` 會踩到 `@vercel/og` 的已知路徑解析 bug（Windows-only，官方 issue #77164），導致 build 失敗；改為靜態 `icon.svg`，並先不產生 OG 分享圖，避免本機建置不穩定
+
+---
+
 ## [0.4.1] — 2026-08-24　Supabase 保持喚醒排程
 
 ### 新增
