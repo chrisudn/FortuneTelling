@@ -4,6 +4,15 @@
 
 ---
 
+## [0.4.1] — 2026-08-24　Supabase 保持喚醒排程
+
+### 新增
+- `GET /api/cron/keepalive`：對 Supabase 執行輕量查詢，避免免費方案專案因 7 天無 API 流量自動暫停
+- `vercel.json`：新增 Vercel Cron，每日凌晨 3 點（UTC）呼叫上述 route
+- 可選 `CRON_SECRET` 環境變數，設定後限制該 route 只接受 Vercel Cron 觸發的請求
+
+---
+
 ## [0.4.0] — 2026-05-29　Supabase Auth + 多裝置同步
 
 ### 新增
