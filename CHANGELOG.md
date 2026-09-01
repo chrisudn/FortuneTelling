@@ -4,6 +4,21 @@
 
 ---
 
+## [0.4.3] — 2026-09-01　SEO 頁面級 Metadata + Google Analytics
+
+### 新增
+- 七個路由（首頁、登入、起卦、結果、歷史列表、日記詳情、個人頁）皆為 client component，拆分為 `<Page>Client.tsx`（互動邏輯）+ 精簡 server `page.tsx`，各自補上專屬 `title`、`description`
+- 依賴登入／session 狀態、原本就被 `robots.ts` 排除索引的頁面（`/cast`、`/result`、`/history`、`/history/[id]`、`/profile`）額外在各自 metadata 加上 `robots: { index: false }`，與 `robots.ts` 形成雙重保險
+- `layout.tsx` 加入 `WebApplication` 型別的 JSON-LD 結構化資料
+- 整合 Google Analytics 4：安裝 `@next/third-parties`，透過 `NEXT_PUBLIC_GA_ID` 環境變數載入 `<GoogleAnalytics>`，僅在正式環境（`NODE_ENV === 'production'`）啟用，避免本機開發流量污染正式數據
+
+### 文件
+- 整併原本並存的 `doc/`、`docs/` 兩個目錄為單一 `docs/`，依 `design/`、`verification/`、`reference/` 分類；執行期資料 `hexagrams.json` 移至 `src/data/`，不再放在文件目錄下
+- 改寫 `AGENTS.md`：原內容誤用另一個專案（紫微斗數排盤）的規範，與本專案架構完全對不上，改為實際反映卦語的技術棧、資料流、硬約束與 commit 規範
+- `.gitignore` 新增忽略 `.claude/`、`.junie/`（AI coding assistant 本機狀態，不應進版控）
+
+---
+
 ## [0.4.2] — 2026-08-24　SEO 基礎建設
 
 ### 新增
