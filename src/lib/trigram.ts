@@ -1,4 +1,4 @@
-import hexagramsData from '../../doc/hexagrams/hexagrams.json'
+import hexagramsData from '../data/hexagrams/hexagrams.json'
 
 export interface TrigramInfo {
   symbol: string

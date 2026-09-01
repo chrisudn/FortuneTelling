@@ -14,9 +14,9 @@
 
 ### 任務清單
 
-- [x] 建立 64 卦完整資料（`doc/hexagrams/hexagrams.json`）
+- [x] 建立 64 卦完整資料（`src/data/hexagrams/hexagrams.json`）
   - 每卦包含：卦名、爻象二進位、上下卦、卦辭、大象傳、6 條爻辭
-- [x] 建立 64 卦 MD 備查文件（`doc/hexagrams/all64.md`）
+- [x] 建立 64 卦 MD 備查文件（`docs/reference/hexagrams-all64.md`）
 - [x] 初始化 Next.js 14 專案（App Router + Tailwind CSS）
 - [x] 建立起卦算法模組（`src/lib/casting.ts`）
   - 模擬三硬幣法（老陽/老陰/少陽/少陰）

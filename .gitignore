@@ -5,3 +5,7 @@ node_modules/
 out/
 *.log
 *.tsbuildinfo
+
+# AI coding assistant 本機狀態，不進版控
+.claude/
+.junie/
