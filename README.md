@@ -94,11 +94,20 @@ src/
     ├── diary.ts              # 日記 localStorage 操作
     └── storage.ts            # 占卜 session 儲存
 
-doc/
-├── hexagrams/
-│   ├── hexagrams.json        # 64 卦完整資料（卦辭、爻辭）
-│   └── all64.md              # 備查文件
-└── development-plan.md       # 開發計畫與驗收檢核表
+src/data/
+└── hexagrams/
+    └── hexagrams.json        # 64 卦完整資料（卦辭、爻辭）
+
+docs/
+├── design/                   # 產品與架構設計說明
+│   ├── development-plan.md   # 開發計畫與驗收檢核表
+│   ├── supabase-auth-plan.md
+│   └── supabase-schema.sql
+├── verification/             # 實測與審查報告
+│   └── code-review-profile.md
+└── reference/                # 領域知識備查
+    ├── fortuneTellingKnowHow.md
+    └── hexagrams-all64.md
 ```
 
 ---
